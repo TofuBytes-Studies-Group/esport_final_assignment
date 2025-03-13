@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "esport_application_final_assignment", "esport_application_final_assignment\esport_application_final_assignment.csproj", "{F20788A1-D49B-48A2-A281-0848098EAE58}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F20788A1-D49B-48A2-A281-0848098EAE58}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F20788A1-D49B-48A2-A281-0848098EAE58}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F20788A1-D49B-48A2-A281-0848098EAE58}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F20788A1-D49B-48A2-A281-0848098EAE58}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
