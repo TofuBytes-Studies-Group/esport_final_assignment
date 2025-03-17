@@ -3,6 +3,8 @@ using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using MySql.Data.MySqlClient;
+using System.Diagnostics;
+
 
 class Program
 {
@@ -22,12 +24,17 @@ Menu:
 2. Pessimistic Concurrency Control
 3. Registration of player
 4. Pessimistic registration of player
-5. Exit");
+5. OCC for registration of player
+6. PCC for match result
+7. Exit");
 
-            Console.Write("\nChoose an option (1-5): ");
+            Console.Write("\nChoose an option (1-7): ");
             string choice = Console.ReadLine();
+            
 
-            if (choice == "5") break;
+            if (choice == "7") break;
+            
+            int threadCount = 10; // Number of threads to simulate concurrent operations
 
             int tournamentId = 6; // Tournament ID being updated
             int matchId = 1;
@@ -65,6 +72,47 @@ Menu:
                 Task admin1 = Task.Run(() => PessimisticRegisterPlayerInTournament(tournamentId, playerId, ConnectionString ));
                 Task admin2 = Task.Run(() => PessimisticRegisterPlayerInTournament(tournamentId, playerId, ConnectionString2 ));
                 Task.WaitAll(admin1, admin2);
+            }
+            else if (choice == "5")
+            {
+                Console.WriteLine("\n[Using OCC to register player]\n");
+
+                int tournamentId1 = 2;
+
+                Task[] tasks = new Task[threadCount];
+                Stopwatch stopwatch = Stopwatch.StartNew();
+
+                for (int i = 0; i < threadCount; i++)
+                {
+                    int threadNum = i + 1;
+                    tasks[i] = Task.Run(() => OptimisticRegisterPlayer(tournamentId1, playerId, threadNum));
+                }
+
+                Task.WaitAll(tasks);
+                stopwatch.Stop();
+
+                Console.WriteLine($"Simulation completed in {stopwatch.ElapsedMilliseconds} ms.");
+            }
+            else if (choice == "6")
+            {
+                Console.WriteLine("\n[Using PCC to register player]\n");
+
+                int matchIdP = 2;
+                int threadCountP = 5; // Simulating 5 concurrent users
+
+                Task[] tasks = new Task[threadCountP];
+                Stopwatch stopwatch = Stopwatch.StartNew();
+
+                for (int i = 0; i < threadCountP; i++)
+                {
+                    int threadNum = i + 1;
+                    tasks[i] = Task.Run(() => PessimisticUpdateMatchWinner(matchIdP, threadNum));
+                }
+
+                Task.WaitAll(tasks);
+                stopwatch.Stop();
+
+                Console.WriteLine($"Simulation completed in {stopwatch.ElapsedMilliseconds} ms.");
             }
             else
             {
@@ -338,6 +386,160 @@ Menu:
     }
 }
 
+    static void OptimisticRegisterPlayer(int tournamentId, int playerId, int threadNum)
+    {
+        using (MySqlConnection conn = new MySqlConnection(ConnectionString))
+        {
+            conn.Open();
+            bool success = false;
+            int attempts = 0;
+
+            while (!success && attempts < 5) // Retry up to 5 times
+            {
+                attempts++;
+                MySqlTransaction transaction = conn.BeginTransaction();
+
+                try
+                {
+                    // Step 1: Read tournament version
+                    int currentVersion;
+                    int currentPlayers;
+                    int maxPlayers;
+
+                    using (MySqlCommand cmd = new MySqlCommand(
+                               "SELECT version, max_players, (SELECT COUNT(*) FROM Tournament_Registrations WHERE tournament_id = @id) AS current_players FROM Tournaments WHERE tournament_id = @id",
+                               conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@id", tournamentId);
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (!reader.Read())
+                            {
+                                Console.WriteLine($"[Thread {threadNum}] Tournament not found.");
+                                return;
+                            }
+
+                            currentVersion = reader.GetInt32("version");
+                            maxPlayers = reader.GetInt32("max_players");
+                            currentPlayers = reader.GetInt32("current_players");
+                        }
+                    }
+
+                    // Step 2: Check if space is available
+                    if (currentPlayers >= maxPlayers)
+                    {
+                        Console.WriteLine($"[Thread {threadNum}] Tournament is full. Registration failed.");
+                        return;
+                    }
+
+                    // Step 3: Try to register using OCC (version check)
+                    using (MySqlCommand cmd = new MySqlCommand(
+                               "UPDATE Tournaments SET version = version + 1 WHERE tournament_id = @id AND version = @version",
+                               conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@id", tournamentId);
+                        cmd.Parameters.AddWithValue("@version", currentVersion);
+
+                        int rowsAffected = cmd.ExecuteNonQuery();
+
+                        if (rowsAffected == 0)
+                        {
+                            Console.WriteLine($"[Thread {threadNum}] OCC version mismatch. Retrying...");
+                            transaction.Rollback();
+                            Thread.Sleep(100); // Wait before retrying
+                            continue;
+                        }
+                    }
+
+                    // Step 4: Insert player into tournament
+                    using (MySqlCommand cmd = new MySqlCommand(
+                               "INSERT INTO Tournament_Registrations (tournament_id, player_id) VALUES (@tournamentId, @playerId)",
+                               conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@tournamentId", tournamentId);
+                        cmd.Parameters.AddWithValue("@playerId", playerId);
+
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                    Console.WriteLine(
+                        $"[Thread {threadNum}] Player {playerId} successfully registered in tournament {tournamentId}.");
+                    success = true;
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    Console.WriteLine($"[Thread {threadNum}] Transaction failed: {ex.Message}");
+                }
+            }
+
+            if (!success)
+            {
+                Console.WriteLine($"[Thread {threadNum}] Registration failed after multiple attempts.");
+            }
+        }
+    }
     
-    
+    static void PessimisticUpdateMatchWinner(int matchId, int playerId)
+    {
+        using (MySqlConnection conn = new MySqlConnection(ConnectionString))
+        {
+            conn.Open();
+            MySqlTransaction transaction = conn.BeginTransaction();
+
+            try
+            {
+                Stopwatch threadTimer = Stopwatch.StartNew();
+
+                // Step 1: Lock the match row to prevent concurrent updates
+                using (MySqlCommand cmd = new MySqlCommand(
+                    "SELECT winner_id FROM Matches WHERE match_id = @id FOR UPDATE", conn, transaction))
+                {
+                    cmd.Parameters.AddWithValue("@id", matchId);
+                    MySqlDataReader reader = cmd.ExecuteReader();
+
+                    if (!reader.Read())
+                    {
+                        Console.WriteLine($"[Thread {playerId}] Match not found.");
+                        return;
+                    }
+
+                    int? currentWinner = reader.IsDBNull(0) ? (int?)null : reader.GetInt32(0);
+                    reader.Close();
+
+                    // Simulate processing delay
+                    Thread.Sleep(new Random().Next(500, 1500));
+
+                    // Step 2: Update the match winner
+                    using (MySqlCommand updateCmd = new MySqlCommand(
+                        "UPDATE Matches SET winner_id = @winnerId WHERE match_id = @id", conn, transaction))
+                    {
+                        updateCmd.Parameters.AddWithValue("@id", matchId);
+                        updateCmd.Parameters.AddWithValue("@winnerId", playerId);
+
+                        int rowsAffected = updateCmd.ExecuteNonQuery();
+                        if (rowsAffected == 0)
+                        {
+                            Console.WriteLine($"[Thread {playerId}] Match update failed.");
+                            transaction.Rollback();
+                            return;
+                        }
+                    }
+
+                    // Step 3: Commit the transaction
+                    transaction.Commit();
+                    threadTimer.Stop();
+                    Console.WriteLine($"[Thread {playerId}] Match {matchId} winner set to Player {playerId}. Time taken: {threadTimer.ElapsedMilliseconds} ms");
+                }
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                Console.WriteLine($"[Thread {playerId}] Transaction failed: {ex.Message}");
+            }
+        }
+    }
+
+
 }
