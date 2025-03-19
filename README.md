@@ -122,7 +122,10 @@ CREATE TABLE Matches (
 
 Use optimistic locking when dealing with large datasets that are mostly read-heavy, where conflicts are rare, and performance is a priority. This is best for applications where users primarily retrieve data rather than frequently modifying it.
 
+
 Use pessimistic locking if updates are frequent and there's a high likelihood of multiple users modifying the same records at the same time. This is especially important for small, frequently updated tables (hotspots), where preventing conflicts upfront is more efficient than constantly rolling back transactions.
 
 Ultimately, the right choice depends on how often conflicts occur, the cost of handling them, and whether preventing them proactively (pessimistic) or resolving them after they happen (optimistic) is the better trade-off for the given scenario.
- 
+
+ ---
+For part 2 click here: https://github.com/TofuBytes-Studies-Group/esport_final_assignment/blob/main/FinalAssignmentPART2.md
