@@ -11,7 +11,7 @@ Our key findings is a slight insight into how different database optimization te
 **List Partitioning** --> is useful for queries filtering on specific categories, allowing for more efficient lookups.
 
 **Range Partitioning** --> works well for continuously growing datasets, such as dates, ensuring scalability over time.
---
+
 
 
 ## Key Findings on Query Optimizaion
@@ -21,7 +21,7 @@ Our key findings weren't the most exciting in this part of the exercise, the the
 - in one table even reaching 60
 
 And these changes still proved no change in performance on our end, atleast running it directly throug the MySQL workbench. Maybe if used through an application the results could've proved different but as of now as we didn't find it as a requirement or a suggestion to do so we didn't go through with running it through an application.
--- 
+
 
 
 ## Final Thoughts
