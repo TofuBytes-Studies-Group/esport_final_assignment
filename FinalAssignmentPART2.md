@@ -20,7 +20,7 @@ Our key findings weren't the most exciting in this part of the exercise, the the
 - We think the reason being the insurmountable mass of data that might be needed to properly tests these performance differences, in our setup we started with 10 entries per table, doubled it to 20 and tripled it to 30.
 - in one table even reaching 60
 
-And these changes still proved no change in performance on our end, atleast running it directly throug the MySQL workbench. Maybe if used through an application the results could've proved different but as of now as we didn't find it as a requirement or a suggestion to do so we didn't go through with running it through an application.
+And these changes still proved no change in performance on our end, atleast running it directly through the MySQL workbench. Maybe if used through an application the results could've proved different but as of now, as we didn't find it as a requirement or a suggestion to do so we didn't go through with running it through an application.
 
 
 
